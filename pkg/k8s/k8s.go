@@ -15,33 +15,34 @@ package k8s
 
 import (
 	"github.com/sirupsen/logrus"
+	clientset "github.com/stevesloka/ingressroute-generator/pkg/generated/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// NewClient returns a Kubernetes client using the given config. If no config is
-// provided, assumes it is running inside a Kubernetes cluster and uses the
-// in-cluster config.
-func NewClient(kubeCfgFile string, logger *logrus.Logger) (kubernetes.Interface, error) {
-	config, err := buildConfig(kubeCfgFile, logger)
-	if err != nil {
-		return nil, err
-	}
-	return kubernetes.NewForConfig(config)
-}
-
 // NewClientWithQPS returns a Kubernetes client using the given configuration
 // and rate limiting parameters. If no config is provided, assumes it is running
 // inside a Kubernetes cluster and uses the in-cluster config.
-func NewClientWithQPS(kubeCfgFile string, logger *logrus.Logger, qps float32, burst int) (kubernetes.Interface, error) {
+func NewClientWithQPS(kubeCfgFile string, logger *logrus.Logger, qps float32, burst int) (*kubernetes.Clientset, *clientset.Clientset) {
 	config, err := buildConfig(kubeCfgFile, logger)
 	if err != nil {
-		return nil, err
+		return nil, nil
 	}
 	config.QPS = qps
 	config.Burst = burst
-	return kubernetes.NewForConfig(config)
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	contourClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	return client, contourClient
 }
 
 func buildConfig(kubeCfgFile string, logger *logrus.Logger) (*rest.Config, error) {

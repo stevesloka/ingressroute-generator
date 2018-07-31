@@ -2,23 +2,24 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stevesloka/ingressroute-generator/pkg/generator"
 	"github.com/stevesloka/ingressroute-generator/pkg/k8s"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
 	kubeClientQPS   float64
 	kubeClientBurst int
+	numItems        int
 )
 
 func init() {
 	flag.Float64Var(&kubeClientQPS, "client-qps", 5, "The maximum queries per second (QPS) that can be performed on the Kubernetes API server")
 	flag.IntVar(&kubeClientBurst, "client-burst", 10, "The maximum number of queries that can be performed on the Kubernetes API server during a burst")
+	flag.IntVar(&numItems, "num-items", 10, "The total number of items to create")
 	flag.Parse()
 }
 
@@ -31,14 +32,9 @@ func main() {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
 
-	kubeClient, err := k8s.NewClientWithQPS(*kubeconfig, log, float32(kubeClientQPS), kubeClientBurst)
-	if err != nil {
-		log.Fatal("Could not init k8sclient! ", err)
-	}
+	kubeClient, contourClient := k8s.NewClientWithQPS(*kubeconfig, log, float32(kubeClientQPS), kubeClientBurst)
 
-	svcs, _ := kubeClient.Core().Services("default").List(metav1.ListOptions{})
-	fmt.Println("svcs: ", len(svcs.Items))
-
+	generator.LoopyLoop(10, "default", kubeClient, contourClient)
 }
 
 func homeDir() string {
